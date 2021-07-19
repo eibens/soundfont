@@ -221,40 +221,46 @@ async function load(ac, url) {
 }
 new WebSocket("ws://localhost:1234").addEventListener("message", ()=>window.location.reload()
 );
-const css = `\nhtml {\n  background: #222;\n  font-size: 16px;\n  font-family: "JetBrains Mono", monospace;\n}\n\nbody {\n  display: flex;\n  align-items: stretch;\n  justify-content: stretch;\n  position: absolute;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  margin: 0;\n}\n\n.piano {\n  flex: 1;\n  flex-direction: column;\n  display: flex;\n  align-items: stretch;\n}\n\n.nav {\n  background: #222;\n  box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.5);\n  padding: 0.5rem 1rem;\n}\n\n.key-list {\n  flex: 1;\n  display: flex;\n  list-style: none;\n  align-items: stretch;\n  justify-content: stretch;\n  margin: 0;\n  padding: 1rem;\n}\n\n.key-item {\n  flex: 1;\n  display: flex;\n}\n\n.key {\n  flex: 1;\n  display: flex;\n  align-items: flex-end;\n  justify-content: center;\n  margin: 0.25rem;\n  background: linear-gradient(transparent, white);\n  border-radius: 0.5rem;\n  border: none;\n  font-size: 1.5rem;\n  font-family: inherit;\n  color: rgba(0, 0, 0, 0.75);\n}\n\n.nav h1 {\n  color: white;\n  font-size: 1.5rem;\n  font-weight: normal;\n}\n`;
-const viewport = document.createElement("meta");
-viewport.name = "viewport";
-viewport.content = "width=device-width";
-document.head.appendChild(viewport);
-const styleContent = document.createTextNode(css);
-const style = document.createElement("style");
-style.appendChild(styleContent);
-document.head.appendChild(style);
-const root = document.createElement("div");
-root.classList.add("piano");
-document.body.appendChild(root);
-const nav = document.createElement("nav");
-nav.classList.add("nav");
-root.appendChild(nav);
-const title = document.createElement("h1");
-title.appendChild(new Text("🎹 virtual piano"));
-nav.appendChild(title);
-const keyList = document.createElement("ol");
-keyList.classList.add("key-list");
-root.appendChild(keyList);
-const keys = "C4 D4 E4 F4 G4 A4 B4 C5".split(" ");
-keys.forEach((key)=>{
-    const item = document.createElement("li");
-    item.classList.add("key-item");
-    const label = document.createTextNode(key);
-    const button = document.createElement("button");
-    button.addEventListener("click", ()=>play(key)
-    );
-    button.classList.add("key");
-    button.appendChild(label);
-    item.appendChild(button);
-    keyList.appendChild(item);
-});
+const css = `\nhtml {\n  background: #222;\n  font-size: 16px;\n  font-family: "JetBrains Mono", monospace;\n}\n\nbody {\n  display: flex;\n  align-items: stretch;\n  justify-content: stretch;\n  position: absolute;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  margin: 0;\n}\n\n.piano {\n  flex: 1;\n  flex-direction: column;\n  display: flex;\n  align-items: stretch;\n}\n\n.nav {\n  background: #222;\n  box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.5);\n  padding: 0.5rem 1rem;\n}\n\n.key-list {\n  flex: 1;\n  display: flex;\n  list-style: none;\n  align-items: stretch;\n  justify-content: stretch;\n  margin: 0;\n  padding: 1rem;\n}\n\n.key-item {\n  flex: 1;\n  display: flex;\n}\n\n.key {\n  flex: 1;\n  display: flex;\n  align-items: flex-end;\n  justify-content: center;\n  margin: 0.25rem;\n  background: linear-gradient(transparent, white);\n  border-radius: 0.5rem;\n  border: none;\n  font-size: 1.5rem;\n  font-family: inherit;\n  color: rgba(0, 0, 0, 0.75);\n  transition: opacity 0.25s;\n  padding-bottom: 1rem;\n}\n\n.piano.loading .key {\n  pointer-events: none;\n  opacity: 0.25;\n}\n\n.nav h1 {\n  color: white;\n  font-size: 1.5rem;\n  font-weight: normal;\n}\n`;
+function initPage() {
+    const viewport = document.createElement("meta");
+    viewport.name = "viewport";
+    viewport.content = "width=device-width";
+    document.head.appendChild(viewport);
+    const styleContent = document.createTextNode(css);
+    const style = document.createElement("style");
+    style.appendChild(styleContent);
+    document.head.appendChild(style);
+}
+function createGui(options) {
+    const piano = document.createElement("div");
+    piano.classList.add("piano");
+    piano.classList.add("loading");
+    const nav = document.createElement("nav");
+    nav.classList.add("nav");
+    piano.appendChild(nav);
+    const title = document.createElement("h1");
+    title.appendChild(new Text("🎹 virtual piano"));
+    nav.appendChild(title);
+    const keyList = document.createElement("ol");
+    keyList.classList.add("key-list");
+    piano.appendChild(keyList);
+    options.keys.forEach((key)=>{
+        const item = document.createElement("li");
+        item.classList.add("key-item");
+        const label = document.createTextNode(key);
+        const button = document.createElement("button");
+        button.addEventListener("click", ()=>{
+            if (!options.play) return;
+            options.play(key);
+        });
+        button.classList.add("key");
+        button.appendChild(label);
+        item.appendChild(button);
+        keyList.appendChild(item);
+    });
+    return piano;
+}
 async function createPiano() {
     const ac = new AudioContext();
     const url = getUrl();
@@ -270,4 +276,13 @@ async function createPiano() {
         node.start();
     };
 }
-const play = await createPiano();
+const state = {
+    keys: "C4 D4 E4 F4 G4 A4 B4 C5".split(" ")
+};
+initPage();
+const root = createGui(state);
+document.body.appendChild(root);
+createPiano().then((play)=>{
+    state.play = play;
+    root.classList.remove("loading");
+});

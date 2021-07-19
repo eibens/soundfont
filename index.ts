@@ -7,6 +7,12 @@ import { load } from "./load.ts";
 // Reload the page whenever a WebSocket message is received.
 new WebSocket("ws://localhost:1234")
   .addEventListener("message", () => window.location.reload());
+
+type State = {
+  keys: string[];
+  play?: (key: string) => void;
+};
+
 const css = `
 html {
   background: #222;
@@ -66,6 +72,13 @@ body {
   font-size: 1.5rem;
   font-family: inherit;
   color: rgba(0, 0, 0, 0.75);
+  transition: opacity 0.25s;
+  padding-bottom: 1rem;
+}
+
+.piano.loading .key {
+  pointer-events: none;
+  opacity: 0.25;
 }
 
 .nav h1 {
@@ -75,46 +88,54 @@ body {
 }
 `;
 
-const viewport = document.createElement("meta");
-viewport.name = "viewport";
-viewport.content = "width=device-width";
-document.head.appendChild(viewport);
+function initPage() {
+  const viewport = document.createElement("meta");
+  viewport.name = "viewport";
+  viewport.content = "width=device-width";
+  document.head.appendChild(viewport);
 
-const styleContent = document.createTextNode(css);
-const style = document.createElement("style");
-style.appendChild(styleContent);
-document.head.appendChild(style);
+  const styleContent = document.createTextNode(css);
+  const style = document.createElement("style");
+  style.appendChild(styleContent);
+  document.head.appendChild(style);
+}
 
-const root = document.createElement("div");
-root.classList.add("piano");
-document.body.appendChild(root);
+function createGui(options: State) {
+  const piano = document.createElement("div");
+  piano.classList.add("piano");
+  piano.classList.add("loading");
 
-const nav = document.createElement("nav");
-nav.classList.add("nav");
-root.appendChild(nav);
+  const nav = document.createElement("nav");
+  nav.classList.add("nav");
+  piano.appendChild(nav);
 
-const title = document.createElement("h1");
-title.appendChild(new Text("🎹 virtual piano"));
-nav.appendChild(title);
+  const title = document.createElement("h1");
+  title.appendChild(new Text("🎹 virtual piano"));
+  nav.appendChild(title);
 
-const keyList = document.createElement("ol");
-keyList.classList.add("key-list");
-root.appendChild(keyList);
+  const keyList = document.createElement("ol");
+  keyList.classList.add("key-list");
+  piano.appendChild(keyList);
 
-const keys = "C4 D4 E4 F4 G4 A4 B4 C5".split(" ");
-keys.forEach((key) => {
-  const item = document.createElement("li");
-  item.classList.add("key-item");
+  options.keys.forEach((key) => {
+    const item = document.createElement("li");
+    item.classList.add("key-item");
 
-  const label = document.createTextNode(key);
-  const button = document.createElement("button");
-  button.addEventListener("click", () => play(key));
-  button.classList.add("key");
+    const label = document.createTextNode(key);
+    const button = document.createElement("button");
+    button.addEventListener("click", () => {
+      if (!options.play) return;
+      options.play(key);
+    });
+    button.classList.add("key");
 
-  button.appendChild(label);
-  item.appendChild(button);
-  keyList.appendChild(item);
-});
+    button.appendChild(label);
+    item.appendChild(button);
+    keyList.appendChild(item);
+  });
+
+  return piano;
+}
 
 async function createPiano() {
   const ac = new AudioContext();
@@ -132,4 +153,14 @@ async function createPiano() {
   };
 }
 
-const play = await createPiano();
+const state: State = {
+  keys: "C4 D4 E4 F4 G4 A4 B4 C5".split(" "),
+};
+
+initPage();
+const root = createGui(state);
+document.body.appendChild(root);
+createPiano().then((play) => {
+  state.play = play;
+  root.classList.remove("loading");
+});
