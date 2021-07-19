@@ -9,12 +9,13 @@ browser, implemented in TypeScript for Deno.
 # Motivation
 
 Symbolic music formats (e.g. MIDI, sheet music) do not provide sound data. In
-order to play symbolic music, one has to map symbolic notes to audio files. These mappings are called sound fonts. [soundfont] helps with finding, loading, and using sound fonts.
+order to play symbolic music, one has to map symbolic notes to audio files.
+These mappings are called sound fonts. [soundfont] helps with finding, loading,
+and using sound fonts.
 
 # Example
 
 - [Virtual Piano][website]
-
 
 [website]: https://eibens.github.io/soundfont
 [soundfont]: #
