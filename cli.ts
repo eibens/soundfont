@@ -12,14 +12,12 @@ if (import.meta.main) {
     },
     pages: {
       index: html({
-        // TODO(surv): Replace with website title.
-        title: "Your Website",
+        title: "Soundfont",
         modules: ["./index.js"],
       }),
     },
     logger: createLogger({
-      // TODO(surv): Replace with name of CLI.
-      name: "your website cli",
+      name: "soundfont",
     }),
   });
 }
