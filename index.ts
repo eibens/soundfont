@@ -15,8 +15,12 @@ type State = {
 };
 
 const css = `
+:root {
+  --background-color: #111;
+}
+
 html {
-  background: #222;
+  background: var(--background-color);
   font-size: 16px;
   font-family: "JetBrains Mono", monospace;
 }
@@ -41,9 +45,19 @@ body {
 }
 
 .nav {
-  background: #222;
-  box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.5);
-  padding: 0.5rem 1rem;
+  pointer-events: none;
+  background: linear-gradient(var(--background-color), transparent);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 1rem 2rem;
+}
+
+.nav h1 {
+  color: white;
+  font-size: 1.25rem;
+  font-weight: normal;
 }
 
 .key-list {
@@ -53,7 +67,7 @@ body {
   align-items: stretch;
   justify-content: stretch;
   margin: 0;
-  padding: 1rem;
+  padding: 0.25rem;
 }
 
 .key-item {
@@ -70,22 +84,29 @@ body {
   background: linear-gradient(transparent, white);
   border-radius: 0.5rem;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1rem;
   font-family: inherit;
-  color: rgba(0, 0, 0, 0.75);
-  transition: opacity 0.25s;
+  color: var(--background-color);
+  transition: opacity 0.25s, background 0.5s;
   padding-bottom: 1rem;
+}
+
+.key:hover {
+  background: linear-gradient(transparent, #B2EBF2);
+}
+
+.key:focus {
+  font-weight: bold;
+  outline: none;
+}
+
+.key.pressed {
+  background: linear-gradient(transparent, #26C6DA);
 }
 
 .piano.loading .key {
   pointer-events: none;
   opacity: 0.25;
-}
-
-.nav h1 {
-  color: white;
-  font-size: 1.5rem;
-  font-weight: normal;
 }
 `;
 
@@ -128,10 +149,12 @@ function createGui(options: State) {
     function startNote() {
       if (!options.play) return;
       options.play(key);
+      button.classList.add("pressed");
     }
     function stopNote() {
       if (!options.stop) return;
       options.stop(key);
+      button.classList.remove("pressed");
     }
 
     button.addEventListener("mousedown", startNote);
@@ -146,6 +169,8 @@ function createGui(options: State) {
     keyList.appendChild(item);
   });
 
+  const blackKeys = [null, -1, 1]
+
   return piano;
 }
 
@@ -153,11 +178,22 @@ async function createPiano() {
   const ac = new AudioContext();
   const url = Gleitz.getUrl();
   const font = await load(ac, url);
-  const pressed = new Map<string, () => void>();
+  const pressed = new Map<string, {
+    node: AudioBufferSourceNode;
+    gain: GainNode;
+  }>();
   return {
     stop(key: string) {
-      const stop = pressed.get(key);
-      if (stop) stop();
+      const note = pressed.get(key);
+      if (!note) return;
+
+      const release = 0.125;
+      const now = ac.currentTime;
+      note.gain.gain.setValueAtTime(1, now);
+      note.gain.gain.linearRampToValueAtTime(0, now + release);
+      setTimeout(() => {
+        note.gain.disconnect();
+      }, release * 1000);
     },
     play(key: string) {
       if (!font[key]) {
@@ -167,6 +203,7 @@ async function createPiano() {
       this.stop(key);
 
       const gain = ac.createGain();
+      gain.gain.setValueAtTime(1, ac.currentTime);
       gain.connect(ac.destination);
 
       const node = ac.createBufferSource();
@@ -174,15 +211,9 @@ async function createPiano() {
       node.connect(gain);
 
       node.start();
-      pressed.set(key, () => {
-        const release = 0.125;
-        const now = ac.currentTime;
-        console.log(now);
-        gain.gain.setValueAtTime(1, now);
-        gain.gain.linearRampToValueAtTime(0, now + release);
-        setTimeout(() => {
-          node.stop();
-        }, release * 1000);
+      pressed.set(key, {
+        node,
+        gain,
       });
     },
   };

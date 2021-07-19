@@ -221,7 +221,7 @@ async function load(ac, url) {
 }
 new WebSocket("ws://localhost:1234").addEventListener("message", ()=>window.location.reload()
 );
-const css = `\nhtml {\n  background: #222;\n  font-size: 16px;\n  font-family: "JetBrains Mono", monospace;\n}\n\nbody {\n  display: flex;\n  align-items: stretch;\n  justify-content: stretch;\n  position: absolute;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  margin: 0;\n}\n\n.piano {\n  flex: 1;\n  flex-direction: column;\n  display: flex;\n  align-items: stretch;\n}\n\n.nav {\n  background: #222;\n  box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.5);\n  padding: 0.5rem 1rem;\n}\n\n.key-list {\n  flex: 1;\n  display: flex;\n  list-style: none;\n  align-items: stretch;\n  justify-content: stretch;\n  margin: 0;\n  padding: 1rem;\n}\n\n.key-item {\n  flex: 1;\n  display: flex;\n}\n\n.key {\n  flex: 1;\n  display: flex;\n  align-items: flex-end;\n  justify-content: center;\n  margin: 0.25rem;\n  background: linear-gradient(transparent, white);\n  border-radius: 0.5rem;\n  border: none;\n  font-size: 1.5rem;\n  font-family: inherit;\n  color: rgba(0, 0, 0, 0.75);\n  transition: opacity 0.25s;\n  padding-bottom: 1rem;\n}\n\n.piano.loading .key {\n  pointer-events: none;\n  opacity: 0.25;\n}\n\n.nav h1 {\n  color: white;\n  font-size: 1.5rem;\n  font-weight: normal;\n}\n`;
+const css = `\n:root {\n  --background-color: #111;\n}\n\nhtml {\n  background: var(--background-color);\n  font-size: 16px;\n  font-family: "JetBrains Mono", monospace;\n}\n\nbody {\n  display: flex;\n  align-items: stretch;\n  justify-content: stretch;\n  position: absolute;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  margin: 0;\n}\n\n.piano {\n  flex: 1;\n  flex-direction: column;\n  display: flex;\n  align-items: stretch;\n}\n\n.nav {\n  pointer-events: none;\n  background: linear-gradient(var(--background-color), transparent);\n  position: absolute;\n  top: 0;\n  left: 0;\n  right: 0;\n  padding: 1rem 2rem;\n}\n\n.nav h1 {\n  color: white;\n  font-size: 1.25rem;\n  font-weight: normal;\n}\n\n.key-list {\n  flex: 1;\n  display: flex;\n  list-style: none;\n  align-items: stretch;\n  justify-content: stretch;\n  margin: 0;\n  padding: 0.25rem;\n}\n\n.key-item {\n  flex: 1;\n  display: flex;\n}\n\n.key {\n  flex: 1;\n  display: flex;\n  align-items: flex-end;\n  justify-content: center;\n  margin: 0.25rem;\n  background: linear-gradient(transparent, white);\n  border-radius: 0.5rem;\n  border: none;\n  font-size: 1rem;\n  font-family: inherit;\n  color: var(--background-color);\n  transition: opacity 0.25s, background 0.5s;\n  padding-bottom: 1rem;\n}\n\n.key:hover {\n  background: linear-gradient(transparent, #B2EBF2);\n}\n\n.key:focus {\n  font-weight: bold;\n  outline: none;\n}\n\n.key.pressed {\n  background: linear-gradient(transparent, #26C6DA);\n}\n\n.piano.loading .key {\n  pointer-events: none;\n  opacity: 0.25;\n}\n`;
 function initPage() {
     const viewport = document.createElement("meta");
     viewport.name = "viewport";
@@ -253,10 +253,12 @@ function createGui(options) {
         function startNote() {
             if (!options.play) return;
             options.play(key);
+            button.classList.add("pressed");
         }
         function stopNote() {
             if (!options.stop) return;
             options.stop(key);
+            button.classList.remove("pressed");
         }
         button.addEventListener("mousedown", startNote);
         button.addEventListener("touchstart", startNote);
@@ -276,8 +278,15 @@ async function createPiano() {
     const pressed = new Map();
     return {
         stop (key) {
-            const stop = pressed.get(key);
-            if (stop) stop();
+            const note = pressed.get(key);
+            if (!note) return;
+            const release = 0.125;
+            const now = ac.currentTime;
+            note.gain.gain.setValueAtTime(1, now);
+            note.gain.gain.linearRampToValueAtTime(0, now + 0.125);
+            setTimeout(()=>{
+                note.gain.disconnect();
+            }, 0.125 * 1000);
         },
         play (key) {
             if (!font[key]) {
@@ -286,20 +295,15 @@ async function createPiano() {
             }
             this.stop(key);
             const gain = ac.createGain();
+            gain.gain.setValueAtTime(1, ac.currentTime);
             gain.connect(ac.destination);
             const node = ac.createBufferSource();
             node.buffer = font[key];
             node.connect(gain);
             node.start();
-            pressed.set(key, ()=>{
-                const release = 0.125;
-                const now = ac.currentTime;
-                console.log(now);
-                gain.gain.setValueAtTime(1, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.125);
-                setTimeout(()=>{
-                    node.stop();
-                }, 0.125 * 1000);
+            pressed.set(key, {
+                node,
+                gain
             });
         }
     };
