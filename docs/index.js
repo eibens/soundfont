@@ -250,10 +250,18 @@ function createGui(options) {
         item.classList.add("key-item");
         const label = document.createTextNode(key);
         const button = document.createElement("button");
-        button.addEventListener("click", ()=>{
+        function startNote() {
             if (!options.play) return;
             options.play(key);
-        });
+        }
+        function stopNote() {
+            if (!options.stop) return;
+            options.stop(key);
+        }
+        button.addEventListener("mousedown", startNote);
+        button.addEventListener("touchstart", startNote);
+        button.addEventListener("mouseup", stopNote);
+        button.addEventListener("touchend", stopNote);
         button.classList.add("key");
         button.appendChild(label);
         item.appendChild(button);
@@ -265,15 +273,35 @@ async function createPiano() {
     const ac = new AudioContext();
     const url = getUrl();
     const font = await load(ac, url);
-    return (str)=>{
-        if (!font[str]) {
-            console.error("error: unknown key " + str);
-            return;
+    const pressed = new Map();
+    return {
+        stop (key) {
+            const stop = pressed.get(key);
+            if (stop) stop();
+        },
+        play (key) {
+            if (!font[key]) {
+                console.error("error: unknown key " + key);
+                return;
+            }
+            this.stop(key);
+            const gain = ac.createGain();
+            gain.connect(ac.destination);
+            const node = ac.createBufferSource();
+            node.buffer = font[key];
+            node.connect(gain);
+            node.start();
+            pressed.set(key, ()=>{
+                const release = 0.125;
+                const now = ac.currentTime;
+                console.log(now);
+                gain.gain.setValueAtTime(1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.125);
+                setTimeout(()=>{
+                    node.stop();
+                }, 0.125 * 1000);
+            });
         }
-        const node = ac.createBufferSource();
-        node.buffer = font[str];
-        node.connect(ac.destination);
-        node.start();
     };
 }
 const state = {
@@ -282,7 +310,8 @@ const state = {
 initPage();
 const root = createGui(state);
 document.body.appendChild(root);
-createPiano().then((play)=>{
+createPiano().then(({ play , stop  })=>{
     state.play = play;
+    state.stop = stop;
     root.classList.remove("loading");
 });

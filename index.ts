@@ -11,6 +11,7 @@ new WebSocket("ws://localhost:1234")
 type State = {
   keys: string[];
   play?: (key: string) => void;
+  stop?: (key: string) => void;
 };
 
 const css = `
@@ -123,10 +124,21 @@ function createGui(options: State) {
 
     const label = document.createTextNode(key);
     const button = document.createElement("button");
-    button.addEventListener("click", () => {
+
+    function startNote() {
       if (!options.play) return;
       options.play(key);
-    });
+    }
+    function stopNote() {
+      if (!options.stop) return;
+      options.stop(key);
+    }
+
+    button.addEventListener("mousedown", startNote);
+    button.addEventListener("touchstart", startNote);
+    button.addEventListener("mouseup", stopNote);
+    button.addEventListener("touchend", stopNote);
+
     button.classList.add("key");
 
     button.appendChild(label);
@@ -141,15 +153,38 @@ async function createPiano() {
   const ac = new AudioContext();
   const url = Gleitz.getUrl();
   const font = await load(ac, url);
-  return (str: string) => {
-    if (!font[str]) {
-      console.error("error: unknown key " + str);
-      return;
-    }
-    const node = ac.createBufferSource();
-    node.buffer = font[str];
-    node.connect(ac.destination);
-    node.start();
+  const pressed = new Map<string, () => void>();
+  return {
+    stop(key: string) {
+      const stop = pressed.get(key);
+      if (stop) stop();
+    },
+    play(key: string) {
+      if (!font[key]) {
+        console.error("error: unknown key " + key);
+        return;
+      }
+      this.stop(key);
+
+      const gain = ac.createGain();
+      gain.connect(ac.destination);
+
+      const node = ac.createBufferSource();
+      node.buffer = font[key];
+      node.connect(gain);
+
+      node.start();
+      pressed.set(key, () => {
+        const release = 0.125;
+        const now = ac.currentTime;
+        console.log(now);
+        gain.gain.setValueAtTime(1, now);
+        gain.gain.linearRampToValueAtTime(0, now + release);
+        setTimeout(() => {
+          node.stop();
+        }, release * 1000);
+      });
+    },
   };
 }
 
@@ -160,7 +195,8 @@ const state: State = {
 initPage();
 const root = createGui(state);
 document.body.appendChild(root);
-createPiano().then((play) => {
+createPiano().then(({ play, stop }) => {
   state.play = play;
+  state.stop = stop;
   root.classList.remove("loading");
 });
