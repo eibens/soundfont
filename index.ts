@@ -169,8 +169,6 @@ function createGui(options: State) {
     keyList.appendChild(item);
   });
 
-  const blackKeys = [null, -1, 1]
-
   return piano;
 }
 
